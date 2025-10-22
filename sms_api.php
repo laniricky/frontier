@@ -3,7 +3,7 @@ header("Content-Type: application/json");
 
 // Allow only POST
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    echo json_encode(["status" => "error", "error" => "Only POST allowed"]);
+    echo json_encode(["status" => "error", "message" => "Only POST allowed"]);
     exit;
 }
 
@@ -16,33 +16,37 @@ $message = $data['message'] ?? null;
 
 // Validate
 if (!$number || !$message) {
-    echo json_encode(["status" => "error", "error" => "Missing 'number' or 'message' in JSON body"]);
+    echo json_encode(["status" => "error", "message" => "Missing 'number' or 'message' in JSON body"]);
     exit;
 }
 
-// Handle ping
-if ($number === '0000') {
+// ✅ Handle ping request
+if ($number === '0000' && strtolower(trim($message)) === 'ping') {
     echo json_encode(["status" => "success", "message" => "Ping OK"]);
     exit;
 }
 
-// Run SMS command
-$output = shell_exec("termux-sms-send -n $number '$message' 2>&1");
+// ✅ Safely escape parameters
+$escaped_number = escapeshellarg($number);
+$escaped_message = escapeshellarg($message);
 
-// Log output
+// Execute SMS command
+$output = shell_exec("termux-sms-send -n $escaped_number $escaped_message 2>&1");
+
+// Log all output for debugging
 file_put_contents("debug_log.txt", date("[Y-m-d H:i:s] ") . "Sent to $number → $output\n", FILE_APPEND);
 
-// Detect errors
-if (str_contains(strtolower($output), "permission")) {
-    echo json_encode(["status" => "error", "error" => "Permission denied. Enable SMS permission for Termux."]);
+// ✅ Error detection
+if ($output && str_contains(strtolower($output), "permission")) {
+    echo json_encode(["status" => "error", "message" => "Permission denied. Enable SMS permission for Termux."]);
     exit;
 }
 
-if (str_contains(strtolower($output), "not found")) {
-    echo json_encode(["status" => "error", "error" => "termux-api not installed. Run: pkg install termux-api -y"]);
+if ($output && str_contains(strtolower($output), "not found")) {
+    echo json_encode(["status" => "error", "message" => "Termux:API not installed. Run: pkg install termux-api -y"]);
     exit;
 }
 
-// Assume success if no error output
+// ✅ Default success if no error found
 echo json_encode(["status" => "success", "message" => "SMS sent successfully", "number" => $number]);
 ?>
