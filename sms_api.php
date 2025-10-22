@@ -1,30 +1,37 @@
 <?php
-// sms_api.php
-// Runs inside Termux to receive HTTP POST requests from your PC and send SMS
+// sms_api.php - handles SMS sending via Termux:API
 
-header('Content-Type: application/json');
+header("Content-Type: application/json");
+header("Access-Control-Allow-Origin: *");
+header("Access-Control-Allow-Methods: POST");
+header("Access-Control-Allow-Headers: Content-Type");
 
+// Only allow POST requests
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
-    echo json_encode(["status" => "error", "message" => "Invalid request method"]);
+    echo json_encode(["error" => "Method Not Allowed. Use POST"]);
     exit;
 }
 
-if (!isset($_POST['number']) || !isset($_POST['message'])) {
+// Read POST body
+$data = json_decode(file_get_contents("php://input"), true);
+
+// Validate
+if (!isset($data['number']) || !isset($data['message'])) {
     http_response_code(400);
-    echo json_encode(["status" => "error", "message" => "Missing parameters"]);
+    echo json_encode(["error" => "Missing number or message"]);
     exit;
 }
 
-$number = escapeshellarg($_POST['number']);
-$message = escapeshellarg($_POST['message']);
+$number = escapeshellarg($data['number']);
+$message = escapeshellarg($data['message']);
 
-// Execute the SMS send command and capture any output or errors
-$output = shell_exec("termux-sms-send -n $number $message 2>&1");
+// Try sending SMS
+exec("termux-sms-send -n $number $message 2>&1", $output, $resultCode);
 
-if ($output === NULL) {
-    echo json_encode(["status" => "error", "message" => "Failed to execute termux-sms-send"]);
+if ($resultCode === 0) {
+    echo json_encode(["success" => true, "number" => $data['number'], "message" => "SMS sent successfully"]);
 } else {
-    echo json_encode(["status" => "success", "message" => "SMS sent to $number"]);
+    echo json_encode(["success" => false, "error" => implode("\n", $output)]);
 }
 ?>
