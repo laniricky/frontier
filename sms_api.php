@@ -26,6 +26,12 @@ if (!is_array($data) || empty($data['number']) || empty($data['message'])) {
 $number = $data['number'];
 $message = $data['message'];
 
+if ($number === '0000') {
+    echo json_encode(["success" => true, "message" => "Ping OK"]);
+    exit;
+}
+
+
 // Basic sanitize (do NOT remove plus sign)
 $number_safe = escapeshellarg($number);
 $message_safe = escapeshellarg($message);
